@@ -22,7 +22,7 @@ env:
 jobs:
   check_commits:
     name: Check Commits
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
@@ -41,7 +41,7 @@ jobs:
   build:
     name: Build BPI-R4 with MTK feed
     needs: [check_commits]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Install dependencies
         run: |
@@ -60,49 +60,49 @@ jobs:
 
       - name: Checkout OpenWrt repository
         run: |
-          git clone ${{ env.OPENWRT_REPOSITORY }} openwrt;
-          cd openwrt;
+          git clone ${{ env.OPENWRT_REPOSITORY }} openwrt
+          cd openwrt
           git checkout ${{ env.OPENWRT_REF }}
 
       - name: Checkout MTK OpenWrt feeds repository
         run: |
-          git clone ${{ env.MEDIATEK_REPOSITORY }} mtk-openwrt-feeds;
-          cd mtk-openwrt-feeds;
+          git clone ${{ env.MEDIATEK_REPOSITORY }} mtk-openwrt-feeds
+          cd mtk-openwrt-feeds
           git checkout ${{ env.MEDIATEK_REF }}
 
       - name: Apply patches
         run: |
-          cd mtk-openwrt-feeds;
+          cd mtk-openwrt-feeds
           curl -SL https://raw.githubusercontent.com/pmarques/openwrt/757ae46379e9968af752f972cb60b1348877fe25/package/kernel/mt76/patches/999-tx-power-fix.patch | tee autobuild/unified/filogic/mac80211/24.10/files/package/kernel/mt76/patches/9999-tx-power-fix.patch
 
       - name: Run MTK autobuild prepare
         run: |
-          cd openwrt;
+          cd openwrt
           bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt7988_rfb-mt7996 prepare log_file=make
 
       - name: Copy config from remote repository
         run: |
-          cd openwrt;
+          cd openwrt
           cp ../.config .config
 
       - name: Build the firmware image
         run: |
-          cd openwrt;
+          cd openwrt
           make -j $(nproc) defconfig download world
 
       - name: Compress all packages
         run: |
-          cd openwrt;
+          cd openwrt
           tar caf bin/targets/mediatek/filogic/packages.tar.gz bin/targets/mediatek/filogic/packages
 
       - name: Add config file
         run: |
-          cd openwrt;
+          cd openwrt
           cp .config  bin/targets/mediatek/filogic/config-full
 
       - name: Package output
         run: |
-          cd openwrt;
+          cd openwrt
           tar -cvf ../bpi_r4-images.tar bin/targets/mediatek/filogic
 
       - name: Upload artifacts
@@ -115,7 +115,7 @@ jobs:
     name: Create release
     needs: [build, check_commits]
     if: needs.build.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
