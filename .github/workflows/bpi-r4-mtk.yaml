@@ -1,7 +1,7 @@
 ---
 # https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/
 
-name: Build image for BPi-R4 with MTK feed
+name: build-bpi-r4-mtk
 
 on:
   workflow_dispatch
@@ -26,24 +26,29 @@ jobs:
     outputs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
-      - name: Checkout remote repository
+      - name: Checkout Remote Repository
         uses: actions/checkout@v4
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
-      - name: Get the latest commit SHA
+      - name: Get The Latest Commit SHA
         id: get_sha
         run: |
           echo "latest_commit_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "latest_commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
   build:
-    name: Build BPI-R4 with MTK feed
+    name: Build BPI-R4 With MTK Feeds
     needs: [check_commits]
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+
+      - name: Install Dependencies
         run: |
           sudo apt update
           sudo apt install -y \
@@ -52,60 +57,60 @@ jobs:
             python3-setuptools rsync swig unzip zlib1g-dev file wget curl zstd \
             git libcurl4-openssl-dev
 
-      - name: Checkout remote repository
+      - name: Checkout Remote Repository
         uses: actions/checkout@v4
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
-      - name: Checkout OpenWrt repository
+      - name: Checkout OpenWrt Repository
         run: |
           git clone ${{ env.OPENWRT_REPOSITORY }} openwrt
           cd openwrt
           git checkout ${{ env.OPENWRT_REF }}
 
-      - name: Checkout MTK OpenWrt feeds repository
+      - name: Checkout MTK OpenWrt Feeds Repository
         run: |
           git clone ${{ env.MEDIATEK_REPOSITORY }} mtk-openwrt-feeds
           cd mtk-openwrt-feeds
           git checkout ${{ env.MEDIATEK_REF }}
 
-      - name: Apply patches
+      - name: Apply Patches
         run: |
           cd mtk-openwrt-feeds
           curl -SL https://raw.githubusercontent.com/pmarques/openwrt/757ae46379e9968af752f972cb60b1348877fe25/package/kernel/mt76/patches/999-tx-power-fix.patch | tee autobuild/unified/filogic/mac80211/24.10/files/package/kernel/mt76/patches/9999-tx-power-fix.patch
 
-      - name: Run MTK autobuild prepare
+      - name: Run MTK Autobuild Prepare
         run: |
           cd openwrt
           bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt7988_rfb-mt7996 prepare log_file=make
 
-      - name: Copy config from remote repository
+      - name: Copy Config From Remote Repository
         run: |
           cd openwrt
           cp ../.config .config
 
-      - name: Build the firmware image
+      - name: Build Firmware Image
         run: |
           cd openwrt
           make -j $(nproc) defconfig download world
 
-      - name: Compress all packages
+      - name: Compress All Packages
         run: |
           cd openwrt
           tar caf bin/targets/mediatek/filogic/packages.tar.gz bin/targets/mediatek/filogic/packages
 
-      - name: Add config file
+      - name: Add Config File
         run: |
           cd openwrt
           cp .config  bin/targets/mediatek/filogic/config-full
 
-      - name: Package output
+      - name: Package Output
         run: |
           cd openwrt
           tar -cvf ../bpi_r4-images.tar bin/targets/mediatek/filogic
 
-      - name: Upload artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bpi_r4-images
@@ -117,18 +122,18 @@ jobs:
     if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           name: bpi_r4-images
 
-      - name: Extract artifacts
+      - name: Extract Artifacts
         run: tar xf bpi_r4-images.tar
 
-      - name: Get current date
+      - name: Get Current Date
         run: echo "RELEASE_DATE=$(date +%F)" >> $GITHUB_ENV
 
-      - name: Create release
+      - name: Create Release
         uses: softprops/action-gh-release@master
         with:
           files: bin/targets/mediatek/filogic/*
@@ -139,7 +144,7 @@ jobs:
             Mediatek feed ref: ${{ env.MEDIATEK_REF }}
             Project ref: ${{ needs.check_commits.outputs.latest_commit_sha }}
 
-      - name: Clean up old releases
+      - name: Delete Old Releases
         uses: dev-drprasad/delete-older-releases@master
         with:
           keep_latest: 5
